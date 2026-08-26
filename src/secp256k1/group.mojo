@@ -72,6 +72,15 @@ struct Ge(Copyable, ImplicitlyCopyable, Movable):
         self.y.clear()
         self.infinity = True
 
+    @staticmethod
+    def set_ge_zinv(a: Ge, zi: Fe) -> Ge:
+        """`a` reinterpreted in the frame where its z-inverse is `zi`.
+
+        Used to bring a table of points onto one shared z without inverting.
+        """
+        var zi2 = zi.sqr()
+        return Ge(a.x * zi2, a.y * zi2 * zi, a.infinity)
+
     def mul_lambda(self) -> Ge:
         return Ge(self.x * BETA, self.y, self.infinity)
 
@@ -176,6 +185,7 @@ struct Gej(Copyable, ImplicitlyCopyable, Movable):
     def is_infinity(self) -> Bool:
         return self.infinity
 
+    @always_inline
     def neg(self) -> Gej:
         var y = self.y
         y.normalize_weak()
@@ -215,6 +225,7 @@ struct Gej(Copyable, ImplicitlyCopyable, Movable):
 
     # ------------------------------------------------------------- arithmetic
 
+    @always_inline
     def double(self) -> Gej:
         """Point doubling: 3 mul, 4 sqr. Correct for infinity too."""
         var z = self.z * self.y
@@ -279,6 +290,55 @@ struct Gej(Copyable, ImplicitlyCopyable, Movable):
 
         return Gej(x, y, z, z.normalizes_to_zero())
 
+    @always_inline
+    def double_zr(self) -> Tuple[Gej, Fe]:
+        """`double`, also returning the ratio between the new z and the old.
+
+        The doubling formula sets z_new = z_old * y, so the ratio is y — which
+        a caller walking a table onto a shared z needs alongside the ratios
+        from the additions.
+        """
+        var ratio = self.y
+        ratio.normalize_weak()
+        return (self.double(), ratio)
+
+    @always_inline
+    def add_ge_var_zr(self, b: Ge) -> Tuple[Gej, Fe]:
+        """`add_ge_var`, also returning the ratio between the new z and the old.
+
+        z_new == z_old * h, and `h` is what the caller needs to walk a whole
+        table onto a single shared z afterwards. Only valid on the normal
+        path: the caller must know the points are neither equal nor opposite,
+        which holds for successive odd multiples of a point of large order.
+        """
+        var z12 = self.z.sqr()
+        var u1 = self.x
+        var u2 = b.x * z12
+        var s1 = self.y
+        var s2 = b.y * z12 * self.z
+        var h = u1.negated(4)
+        h.add_assign(u2)
+        var i = s2.negated(1)
+        i.add_assign(s1)
+
+        var z = self.z * h
+        var h2 = h.sqr().negated(1)
+        var h3 = h2 * h
+        var t = u1 * h2
+
+        var x = i.sqr()
+        x.add_assign(h3)
+        x.add_assign(t)
+        x.add_assign(t)
+
+        t.add_assign(x)
+        var y = t * i
+        h3 = h3 * s1
+        y.add_assign(h3)
+
+        return (Gej(x, y, z, False), h)
+
+    @always_inline
     def add_var(self, b: Gej) -> Gej:
         """Add two Jacobian points, branching on the special cases."""
         if self.infinity:
@@ -297,8 +357,8 @@ struct Gej(Copyable, ImplicitlyCopyable, Movable):
         var i = s2.negated(1)
         i.add_assign(s1)
 
-        if h.normalizes_to_zero():
-            if i.normalizes_to_zero():
+        if h.normalizes_to_zero_var():
+            if i.normalizes_to_zero_var():
                 return self.double()
             return Gej.infinity_point()
 
@@ -321,6 +381,7 @@ struct Gej(Copyable, ImplicitlyCopyable, Movable):
 
         return Gej(x, y, z, False)
 
+    @always_inline
     def add_ge_var(self, b: Ge) -> Gej:
         """Mixed addition: add an affine point, branching on special cases.
 
@@ -342,8 +403,8 @@ struct Gej(Copyable, ImplicitlyCopyable, Movable):
         var i = s2.negated(1)
         i.add_assign(s1)
 
-        if h.normalizes_to_zero():
-            if i.normalizes_to_zero():
+        if h.normalizes_to_zero_var():
+            if i.normalizes_to_zero_var():
                 return self.double()
             return Gej.infinity_point()
 
@@ -384,8 +445,8 @@ struct Gej(Copyable, ImplicitlyCopyable, Movable):
         var i = s2.negated(1)
         i.add_assign(s1)
 
-        if h.normalizes_to_zero():
-            if i.normalizes_to_zero():
+        if h.normalizes_to_zero_var():
+            if i.normalizes_to_zero_var():
                 return self.double()
             return Gej.infinity_point()
 

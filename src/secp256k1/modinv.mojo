@@ -103,6 +103,11 @@ def _divsteps_59(
     return (zeta, Trans2x2(Int64(u), Int64(v), Int64(q), Int64(r)))
 
 
+# Inlined, but note the shared `_update_de_62` / `_update_fg_62` /
+# `_normalize_62` below deliberately are not: inlining those as well made the
+# variable-time path slightly faster again but cost the constant-time one 50%
+# (1.72 -> 2.63 us), which signing pays on every call.
+@always_inline
 def _divsteps_62_var(
     eta_in: Int64, f0: UInt64, g0: UInt64
 ) -> Tuple[Int64, Trans2x2]:
@@ -309,6 +314,7 @@ def modinv(x: Signed62, mi: ModInfo) -> Signed62:
     return _normalize_62(d, f.v[4], mi)
 
 
+@always_inline
 def modinv_var(x: Signed62, mi: ModInfo) -> Signed62:
     """Variable-time modular inverse — faster, but the running time depends on
     the input, so use it only on public values."""

@@ -442,112 +442,72 @@ means the Mojo port wins.
 
 | Operation | C | Mojo | Mojo/C |
 |---|---:|---:|---:|
-| ecdsa_sign | 16.7 | 16.7 | **1.00x** |
-| field_sqr | 0.0102 | 0.0101 | 0.99x |
-| field_mul | 0.0111 | 0.0112 | 1.01x |
-| group_double | 0.0722 | 0.0756 | 1.05x |
-| group_add_var | 0.167 | 0.179 | 1.07x |
-| scalar_inverse_var | 1.01 | 1.10 | 1.09x |
-| field_inverse_var | 0.998 | 1.09 | 1.09x |
-| ec_keygen | 10.7 | 11.8 | 1.11x |
-| group_to_affine_var | 1.05 | 1.19 | 1.13x |
-| ecdh | 22.6 | 26.5 | 1.17x |
-| group_add_affine | 0.117 | 0.140 | 1.19x |
-| scalar_mul | 0.0309 | 0.0421 | 1.36x |
-| ecdsa_verify | 23.1 | 34.0 | 1.47x |
-| scalar_split | 0.126 | 0.194 | 1.54x |
-| ecdsa_recover | 24.2 | 37.5 | 1.55x |
-| field_inverse (const time) | 2.12 | 1.72 | 0.81x* |
-| scalar_inverse (const time) | 2.14 | 1.71 | 0.80x* |
+| ecdsa_verify | 23.7 | 22.3 | **0.94x** |
+| ecdsa_sign | 17.2 | 16.1 | **0.94x** |
+| group_add_var | 0.170 | 0.160 | **0.94x** |
+| group_double | 0.0730 | 0.0699 | **0.96x** |
+| ecdh | 23.1 | 22.5 | **0.97x** |
+| group_add_affine | 0.140 | 0.136 | **0.97x** |
+| field_mul | 0.0111 | 0.0109 | **0.98x** |
+| field_sqr | 0.0102 | 0.0102 | 1.00x |
+| group_add_affine_var | 0.119 | 0.119 | 1.00x |
+| field_inverse_var | 1.00 | 1.03 | 1.03x |
+| scalar_inverse_var | 1.01 | 1.04 | 1.03x |
+| ec_keygen | 11.0 | 11.3 | 1.03x |
+| ecdsa_recover | 24.8 | 26.7 | 1.07x |
+| group_to_affine_var | 1.05 | 1.12 | 1.07x |
+| scalar_mul | 0.0310 | 0.0432 | 1.39x |
+| scalar_split | 0.126 | 0.203 | 1.61x |
+| field_inverse (const time) | 2.17 | 1.75 | 0.80x* |
+| scalar_inverse (const time) | 2.19 | 1.74 | 0.79x* |
 
-**Signing is at parity; everything else the C library still wins.** The two
-rows marked `*` are not like-for-like: libsecp256k1's constant-time inversion
-declares its divstep condition variables `volatile` (`modinv64_impl.h`), which
-forces a memory round trip 590 times per inversion to stop the compiler turning
-the masking back into a branch. This port does not replicate that, so it is
-doing strictly less work. The variable-time inversions, where neither side pays
-that cost, are the honest comparison: Mojo is 9% slower.
+**Signing, verification and ECDH are all faster than the C library**, by 3-6%.
+Key generation is within 3% and recovery within 7%.
 
-The two
-rows marked `*` are not like-for-like: libsecp256k1's constant-time inversion
-declares its divstep condition variables `volatile`
-(`modinv64_impl.h`), which forces a memory round trip 590 times per inversion
-to stop the compiler turning the masking back into a branch. This port does not
-replicate that, so it is doing strictly less work. The variable-time inversions,
-where neither side pays that cost, are the honest comparison: Mojo is 7-9%
-slower.
+The two rows marked `*` are not like-for-like: libsecp256k1's constant-time
+inversion declares its divstep condition variables `volatile`
+(`modinv64_impl.h`), forcing a memory round trip 590 times per inversion to
+stop the compiler turning the masking back into a branch. This port does not
+replicate that, so it is doing strictly less work. The variable-time
+inversions, where neither side pays that cost, are the honest comparison: 1.03x.
 
-Reading the rest:
+### What closed the gap
 
-* **The field is at parity.** `field_mul` and `field_sqr` — the operations
-  everything else is built from — match the hand-tuned C to within 2%. Mojo's
-  `UInt128` lowers to the same 64x64 multiply-high instructions. This is the
-  result worth taking away: the language is not the bottleneck.
-* **Group operations are 5-25% slower**, most likely because the C code mutates
-  points in place through pointers where this port returns values, so the
-  formulas move ~120 bytes of struct around per operation.
-* **`ecmult` is ~1.5x**, and two things account for it. libsecp256k1 builds its
-  tables of odd multiples on a shared z coordinate (`ge_table_set_globalz`), so
-  it needs no inversion at all where this port does one per table; and its
-  precomputed table for G uses a 15-bit window against this port's 8-bit, so it
-  makes roughly half as many additions for the `ng*G` half. Neither is hard to
-  adopt.
-* **SHA-256 is 1.9x**, which is what makes signing lag key generation: RFC 6979
-  runs about 22 compression calls per signature. Both sides are plain software
-  SHA-256 — libsecp256k1 ships no hardware-accelerated variant, only a
-  `secp256k1_context_set_sha256_compression` hook for callers who want to
-  supply one.
+This started at 1.47x on verification. Four changes, in order of what they were
+worth:
 
-Building the C library at `-O3` instead of its preferred `-O2` changes nothing
-(it is marginally slower, which is why the project forces `-O2`), so the
-comparison is not an artefact of optimization level.
+1. **Derive the endomorphism table instead of building it.** `lambda*(x, y)`
+   is `(beta*x, y)`, so the second table of odd multiples is one field
+   multiplication per entry rather than a second build with its own inversion.
+   Worth about 6 us — by far the largest single win, and it also removed the
+   `to_ge_var` that used to be needed to reach the affine point.
+2. **Build tables on a shared z** (`_odd_multiples_globalz`). Converting a
+   16-entry table to true affine coordinates costs a field inversion plus about
+   five multiplications per entry; keeping the whole table in one scaled frame
+   and folding that frame into the accumulator's z at the end costs neither.
+   Worth about 2 us, and it applies to `ecmult_const` too.
+3. **`@always_inline` on the field, group and variable-time inversion hot
+   paths.** Worth about 2 us in total, and it is what moved `field_mul`,
+   `group_double` and `group_add_var` from slightly behind C to slightly ahead.
+4. **A wider window for G** (8 to 12 bits), and a variable-time
+   `normalizes_to_zero`. Perhaps 1 us between them.
 
-### Compared with Rust
+Two things that were tried and did not help, recorded so nobody repeats them:
+unrolling `_mul_512` with `comptime for` (no measurable difference — the
+compiler was already doing it), and inlining the *shared* safegcd helpers,
+which sped up the variable-time inversion but cost the constant-time one 50%,
+and signing pays that on every call.
 
-The obvious follow-up question is whether another modern systems language would
-do better. `bench/k256/` benchmarks [k256](https://github.com/RustCrypto/elliptic-curves),
-the RustCrypto pure-Rust secp256k1 implementation, on the same machine with the
-same methodology:
+### What is still slower
 
-| Operation | C | Mojo | Rust (k256) | Mojo/C | Rust/C |
-|---|---:|---:|---:|---:|---:|
-| ecdsa_verify | 23.8 | 35.0 | 50.2 | 1.47x | 2.11x |
-| ecdsa_sign | 17.2 | 22.6 | 34.1 | 1.31x | 1.98x |
-| ec_keygen | 11.0 | 12.4 | 16.8 | 1.13x | 1.53x |
-| ecdh | 23.1 | 27.4 | 31.4 | 1.19x | 1.36x |
-
-This port is faster than k256 on all four, but that is a weaker result than it
-looks, and it does not show that Mojo beats Rust:
-
-* **k256 is a general-purpose library.** It is built on the `elliptic-curve`
-  trait stack and generic over curves, where this port is a direct
-  transcription of secp256k1-specific algorithms. Specialisation is worth a lot
-  here.
-* **There is no hand-tuned pure-Rust competitor to measure.** `rust-secp256k1`,
-  the crate Bitcoin actually uses, is FFI bindings to the same C library — it
-  *is* the C column.
-* **The bottleneck is not codegen in either language.** `field_mul` and
-  `field_sqr` are already at parity with C in Mojo, so both toolchains emit the
-  same 64x64 multiply-high instructions. A Rust port written the way this one
-  was would very likely land in the same place, because what is missing here is
-  algorithmic (the shared-z table trick, a wider generator window), not a
-  language feature.
-
-Where Rust would plausibly have an edge is ergonomics that happen to matter for
-speed: `&mut self` is the natural idiom there, so the group operations would be
-written in place rather than returning ~120-byte structs by value, which is
-probably most of the 5-25% gap on `group_add_affine` and friends. Mojo has `mut`
-references too; this port simply does not use them there yet.
-
-Where Mojo has a real edge is that the GPU path below is the same language and
-much the same code, tested against the same vectors. The Rust equivalent means
-CUDA C, `wgpu` shaders, or `rust-gpu` — a second language or a second toolchain
-either way.
-
-One caveat on the k256 figures, since it is an easy trap: `ProjectivePoint::GENERATOR * scalar`
-takes 31.3 us because the generic `Mul` impl does not consult the precomputed
-table, while `mul_by_generator` takes 16.8 us. The table above uses the fast
-one. The benchmark reports both so the difference stays visible.
+* **`scalar_mul` at 1.39x and `scalar_split` at 1.61x.** The C library uses a
+  three-word comba accumulator for the 512-bit product where this port uses a
+  simple schoolbook loop with 128-bit intermediates. `scalar_split` calls into
+  it five times, which is why it tracks. Neither is on a hot enough path to
+  have been worth rewriting yet — verification does two scalar multiplications
+  against roughly 150 field multiplications.
+* **`ecdsa_recover` at 1.07x**, which is mostly `ecmult` plus a square root;
+  the square root is at parity, so this is the last of the `ecmult` gap.
 
 `bench/bench.mojo` chains each iteration's output into the next input. Without
 that the optimizer hoists loop-invariant calls straight out of the timing loop:

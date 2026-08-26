@@ -157,6 +157,7 @@ struct Fe(Copyable, ImplicitlyCopyable, Movable):
         self.n3 = t3
         self.n4 = t4
 
+    @always_inline
     def normalize_weak(mut self):
         """Reduce limbs to magnitude 1 without a final conditional subtraction.
         """
@@ -224,6 +225,49 @@ struct Fe(Copyable, ImplicitlyCopyable, Movable):
 
     # ------------------------------------------------------------- predicates
 
+    @always_inline
+    def normalizes_to_zero_var(self) -> Bool:
+        """Variable-time `normalizes_to_zero`.
+
+        The fast path reads only limbs 0 and 4 and returns for the vast
+        majority of inputs, which are not zero. Worth having because the
+        variable-time group additions call this on every operation.
+        """
+        var t0 = self.n0
+        var t4 = self.n4
+
+        var x = t4 >> 48
+        t0 += x * 0x1000003D1
+
+        var z0 = t0 & M52
+        var z1 = z0 ^ 0x1000003D0
+
+        if (z0 != 0) and (z1 != M52):
+            return False
+
+        var t1 = self.n1
+        var t2 = self.n2
+        var t3 = self.n3
+        t4 &= M48
+
+        t1 += t0 >> 52
+        t2 += t1 >> 52
+        t1 &= M52
+        z0 |= t1
+        z1 &= t1
+        t3 += t2 >> 52
+        t2 &= M52
+        z0 |= t2
+        z1 &= t2
+        t4 += t3 >> 52
+        t3 &= M52
+        z0 |= t3
+        z1 &= t3
+        z0 |= t4
+        z1 &= t4 ^ 0xF000000000000
+
+        return (z0 == 0) or (z1 == M52)
+
     def is_zero_norm(self) -> Bool:
         """True when a *normalized* element is zero."""
         return (self.n0 | self.n1 | self.n2 | self.n3 | self.n4) == 0
@@ -263,6 +307,7 @@ struct Fe(Copyable, ImplicitlyCopyable, Movable):
 
     # ------------------------------------------------------------- arithmetic
 
+    @always_inline
     def add_assign(mut self, other: Fe):
         self.n0 += other.n0
         self.n1 += other.n1
@@ -278,6 +323,7 @@ struct Fe(Copyable, ImplicitlyCopyable, Movable):
         r.add_assign(other)
         return r
 
+    @always_inline
     def negated(self, magnitude: UInt64) -> Fe:
         """Negate an element whose magnitude is at most `magnitude`."""
         var m2 = 2 * (magnitude + 1)
@@ -317,9 +363,11 @@ struct Fe(Copyable, ImplicitlyCopyable, Movable):
         self.n3 = (t3 >> 1) + ((t4 & 1) << 51)
         self.n4 = t4 >> 1
 
+    @always_inline
     def __mul__(self, b: Fe) -> Fe:
         return _mul_inner(self, b)
 
+    @always_inline
     def sqr(self) -> Fe:
         return _sqr_inner(self)
 
@@ -379,6 +427,7 @@ def _lo(c: UInt128) -> UInt64:
     return UInt64(c & UInt128(0xFFFFFFFFFFFFFFFF))
 
 
+@always_inline
 def _mul_inner(a: Fe, b: Fe) -> Fe:
     var a0 = a.n0
     var a1 = a.n1
@@ -453,6 +502,7 @@ def _mul_inner(a: Fe, b: Fe) -> Fe:
     return Fe.from_limbs(r0, r1, r2, r3, r4)
 
 
+@always_inline
 def _sqr_inner(a: Fe) -> Fe:
     var a0 = a.n0
     var a1 = a.n1

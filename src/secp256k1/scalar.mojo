@@ -161,6 +161,7 @@ struct Scalar(Copyable, Equatable, ImplicitlyCopyable, Movable):
         var r = self.add_with_overflow(b)
         return r[0]
 
+    @always_inline
     def add_with_overflow(self, b: Scalar) -> Tuple[Scalar, Bool]:
         var t = UInt128(self.d0) + UInt128(b.d0)
         var r0 = _lo(t)
@@ -178,6 +179,7 @@ struct Scalar(Copyable, Equatable, ImplicitlyCopyable, Movable):
         var over = _lo(t) + UInt64(r.check_overflow())
         return (_reduce(r, over), over != 0)
 
+    @always_inline
     def negated(self) -> Scalar:
         var nonzero = UInt64(0xFFFFFFFFFFFFFFFF) * UInt64(not self.is_zero())
         var t = UInt128(~self.d0) + UInt128(N0 + 1)
@@ -217,6 +219,7 @@ struct Scalar(Copyable, Equatable, ImplicitlyCopyable, Movable):
         var r3 = _lo(t) + (self.d3 >> 1) + (NH3 & mask)
         return Scalar(r0, r1, r2, r3)
 
+    @always_inline
     def __mul__(self, b: Scalar) -> Scalar:
         var l = _mul_512(self, b)
         return _reduce_512(l)
@@ -326,6 +329,7 @@ def _push_be64(mut out: List[UInt8], v: UInt64):
         out.append(UInt8((v >> UInt64(56 - 8 * i)) & 0xFF))
 
 
+@always_inline
 def _reduce(a: Scalar, overflow: UInt64) -> Scalar:
     """Conditionally add 2^256 - n, `overflow` times (0 or 1)."""
     var t = UInt128(a.d0) + UInt128(overflow * NC0)
@@ -361,6 +365,7 @@ def _mul_512(a: Scalar, b: Scalar) -> InlineArray[UInt64, 8]:
     return l^
 
 
+@always_inline
 def _reduce_512(l: InlineArray[UInt64, 8]) -> Scalar:
     """Reduce a 512-bit value modulo n, following scalar_4x64_impl.h."""
     var n0 = l[4]

@@ -321,6 +321,10 @@ def main() raises:
         sink += Int(x.z.normalized().n0)
     t_gaddvar.report("group_add_var")
 
+    # Two separate rows: `add_ge` is the constant-time mixed addition
+    # (7M + 5S with conditional moves), `add_ge_var` the variable-time one
+    # (8M + 3S). Reporting one against the other's C counterpart compares
+    # different algorithms, which is what this benchmark used to do.
     var t_gaddge = Timer()
     for _ in range(ROUNDS):
         comptime ITERS = 50000
@@ -331,6 +335,17 @@ def main() raises:
         t_gaddge.record(perf_counter_ns() - t0, ITERS)
         sink += Int(x.z.normalized().n0)
     t_gaddge.report("group_add_affine")
+
+    var t_gaddgevar = Timer()
+    for _ in range(ROUNDS):
+        comptime ITERS = 50000
+        var x = pj
+        var t0 = perf_counter_ns()
+        for _ in range(ITERS):
+            x = x.add_ge_var(pk)
+        t_gaddgevar.record(perf_counter_ns() - t0, ITERS)
+        sink += Int(x.z.normalized().n0)
+    t_gaddgevar.report("group_add_affine_var")
 
     # Mirrors bench_group_to_affine_var in the C suite: feed the output
     # coordinates back into the input so the call cannot be hoisted, and so
