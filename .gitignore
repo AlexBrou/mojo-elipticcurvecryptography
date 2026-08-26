@@ -12,3 +12,8 @@ reference/
 
 # node
 examples/node/node_modules/
+
+# built Python extension module
+secp256k1_mojo.so
+secp256k1_mojo.dylib
+__pycache__/

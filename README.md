@@ -26,8 +26,9 @@ src/secp256k1/
   scrub.mojo     volatile wipes, for clearing secrets after use
 vendor/mojo-sha256/   SHA-256, HMAC and RFC 6979 (git submodule)
 ffi/capi.mojo         C ABI wrapper, for use from other languages
+ffi/secp256k1_mojo.mojo  native CPython extension module
 include/              the C header for that ABI
-examples/             C, Python and Node programs that call the shared library
+examples/             C, Python and Node programs that use the library
 Dockerfile            library image (125 MB): the shared library and nothing else
 Dockerfile.examples   adds Python and Node, to run the FFI demos
 Dockerfile.bench      adds the C and Rust toolchains, to benchmark against
@@ -142,7 +143,13 @@ compiler at `src/` with `-I`, or precompile with
 tied to the compiler version that produced it, so it is not a distribution
 format.
 
-### From C, Python, Node, or anything else with an FFI
+### From Python
+
+`import secp256k1_mojo` — a native extension module, covered
+[below](#python). It is the nicest of the bindings and does not go through the
+C ABI at all.
+
+### From C, Node, or anything else with an FFI
 
 `ffi/capi.mojo` exports a C ABI, so the library builds into an ordinary shared
 object with plain C symbols — the same way libsecp256k1 is consumed:
@@ -222,51 +229,47 @@ the same way. Run it with `./examples/build_and_run.sh`; it is also part of
 
 #### Python
 
-No Mojo needed on the Python side — this is plain `ctypes`:
+Python gets a **native CPython extension module**, not a ctypes wrapper.
+`ffi/secp256k1_mojo.mojo` uses Mojo's `PythonModuleBuilder`, so `Context` is an
+ordinary Python class, arguments and results are `bytes`, and failures raise
+exceptions:
 
 ```python
-import ctypes
-from ctypes import POINTER, c_char, c_int, c_void_p
+import secp256k1_mojo
 
-lib = ctypes.CDLL("./libsecp256k1_mojo.dylib")
-buf = POINTER(c_char)
+ctx = secp256k1_mojo.Context()      # precomputes the generator table; reuse it
 
-# Declaring these is not optional: without argtypes, ctypes assumes int
-# arguments and truncates the 64-bit context pointer on the way in.
-lib.secp256k1_mojo_context_create.restype = c_void_p
-lib.secp256k1_mojo_ec_pubkey_create.argtypes = [c_void_p, buf, buf]
-lib.secp256k1_mojo_ecdsa_sign.argtypes = [c_void_p, buf, buf, buf]
-lib.secp256k1_mojo_ecdsa_verify.argtypes = [c_void_p, buf, buf, buf, c_int]
+pub = ctx.public_key(seckey, True)  # True for the 33-byte compressed form
+sig = ctx.sign(msg32, seckey)
+ok = ctx.verify(sig, msg32, pub)
 
-ctx = lib.secp256k1_mojo_context_create()
+sig_r, recovery_id = ctx.sign_recoverable(msg32, seckey)
+assert ctx.recover(sig_r, recovery_id, msg32) == pub
 
-pub = ctypes.create_string_buffer(33)
-lib.secp256k1_mojo_ec_pubkey_create(ctx, pub, seckey)
+shared = ctx.shared_secret(pub, seckey)   # hash this before using it as a key
 
-sig = ctypes.create_string_buffer(64)
-lib.secp256k1_mojo_ecdsa_sign(ctx, sig, msg32, seckey)
-
-ok = lib.secp256k1_mojo_ecdsa_verify(ctx, sig, msg32, pub, 33) == 1
-lib.secp256k1_mojo_context_destroy(ctx)
+ctx.sign(b"too short", seckey)      # raises ValueError, not a status code
 ```
 
-[`examples/use_from_python.py`](examples/use_from_python.py) wraps the whole
-ABI in a `Secp256k1` class with a context manager, covering signing, recovery,
-DER, ECDH and tweaks:
+Build and run it:
 
-```python
-with Secp256k1() as ctx:
-    pub = ctx.pubkey(seckey)
-    sig = ctx.sign(msg32, seckey)
-    assert ctx.verify(sig, msg32, pub)
-
-    rsig, recid = ctx.sign_recoverable(msg32, seckey)
-    assert ctx.recover(rsig, recid, msg32) == pub
-
-    shared = ctx.shared_secret(pub, seckey)     # hash this before using it
+```
+./examples/build_python.sh
 ```
 
-Run it with `LIBSECP256K1_MOJO=/path/to/lib python3 examples/use_from_python.py`.
+which compiles `secp256k1_mojo.so` and runs
+[`examples/use_from_python.py`](examples/use_from_python.py). By hand:
+
+```
+mojo build --emit shared-lib -I src -I vendor/mojo-sha256/src \
+    -o secp256k1_mojo.so ffi/secp256k1_mojo.mojo
+```
+
+The file name, the module name and the `PyInit_` suffix all have to match, and
+the `.so` has to be somewhere on `sys.path`.
+
+Nothing stops you using the plain C ABI from Python through `ctypes` instead —
+it is the same library — but there is no reason to prefer it.
 
 #### Node
 

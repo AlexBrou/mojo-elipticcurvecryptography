@@ -95,10 +95,10 @@ jobs:
           pixi run mojo build --emit shared-lib -I src -I vendor/mojo-sha256/src \
             -o libsecp256k1_mojo.so ffi/capi.mojo
 
-      - name: Python binding
-        env:
-          LIBSECP256K1_MOJO: ${{ github.workspace }}/libsecp256k1_mojo.so
-        run: python3 examples/use_from_python.py
+      # The Python binding is a native CPython extension, not ctypes, so it is
+      # built separately from the C ABI library above.
+      - name: Python extension module
+        run: ./examples/build_python.sh
 
       - uses: actions/setup-node@v4
         with:

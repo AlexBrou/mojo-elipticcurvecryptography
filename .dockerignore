@@ -9,3 +9,4 @@ examples/node/node_modules/
 *.so
 
 # vendor/ IS needed: it holds the sha256 submodule
+secp256k1_mojo.so
