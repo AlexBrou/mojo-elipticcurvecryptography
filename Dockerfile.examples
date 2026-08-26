@@ -1,0 +1,38 @@
+# The FFI demos: the library image plus the interpreters they need.
+#
+#   docker build -t secp256k1-mojo .                             # required first
+#   docker build -f Dockerfile.examples -t secp256k1-mojo-examples .
+#   docker run --rm secp256k1-mojo-examples                      # Python and Node
+#   docker run --rm secp256k1-mojo-examples python3 examples/use_from_python.py
+#   docker run --rm secp256k1-mojo-examples node examples/node/index.js
+#
+# Separate from Dockerfile so that nodejs and npm — most of the difference
+# between a 125 MB and a 390 MB image — stay out of the library image.
+#
+# The C example is not here: it links against libsecp256k1 as well, to
+# cross-check every result, and the library image deliberately does not carry
+# it. Run that one with `./examples/build_and_run.sh` on the host, or inside
+# the dev image, where `./run_tests.sh` covers it.
+#
+# BASE lets you point at another tag:
+#   docker build -f Dockerfile.examples --build-arg BASE=secp256k1-mojo:v2 .
+ARG BASE=secp256k1-mojo
+FROM ${BASE}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates python3 nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY examples ./examples
+COPY include ./include
+
+# koffi is the Node FFI binding; installing it here makes the Node example
+# runnable straight out of the image.
+RUN cd examples/node && npm install --omit=dev --silent
+
+ENV LIBSECP256K1_MOJO=/usr/local/lib/libsecp256k1_mojo.so
+
+CMD ["sh", "-c", "\
+    echo '=== Python ===' && python3 examples/use_from_python.py && \
+    echo && echo '=== Node ===' && node examples/node/index.js"]

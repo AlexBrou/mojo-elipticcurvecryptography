@@ -1,0 +1,16 @@
+[package]
+name = "k256bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Default features stay on, which is what enables `precomputed-tables`;
+# without it k*G is about twice as slow and the comparison is meaningless.
+k256 = { version = "0.13", features = ["ecdsa", "ecdh", "arithmetic"] }
+elliptic-curve = "0.13"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

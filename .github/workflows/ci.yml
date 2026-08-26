@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ARM, where the sha256 dependency uses the ARMv8 crypto extension.
+          - name: linux-arm64
+            runner: ubuntu-24.04-arm
+          # x86, where it falls back to portable SHA-256. Both must pass.
+          - name: linux-x64
+            runner: ubuntu-24.04
+          - name: macos-arm64
+            runner: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # mojo-sha256 is a submodule and the build will not compile without it
+          submodules: recursive
+
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+
+      - name: Show toolchain
+        run: pixi run mojo --version
+
+      # Needed by the C interop example, which links both libraries and
+      # compares results. The Mojo test vectors are committed, so this is not
+      # required for the tests themselves — but it is the check that proves the
+      # port still agrees with the C library, so CI runs it.
+      - name: Build libsecp256k1
+        run: ./tools/fetch_reference.sh
+
+      # No GPU on any hosted runner. The GPU tests are covered locally; see the
+      # README.
+      - name: Run tests
+        env:
+          SECP256K1_SKIP_GPU: "1"
+        run: ./run_tests.sh
+
+  format:
+    name: format and lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+
+      - name: Check formatting
+        run: ./tools/check_format.sh
+
+      # Mojo has no separate linter; the compiler is it. This turns warnings
+      # into failures.
+      - name: Check for compiler warnings
+        run: ./tools/check_warnings.sh
+
+  ffi:
+    name: C ABI and bindings
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+
+      # The shared library is the artefact other languages consume, so build it
+      # and check the Python and Node bindings against it.
+      - name: Build the shared library
+        run: |
+          pixi run mojo build --emit shared-lib -I src -I vendor/mojo-sha256/src \
+            -o libsecp256k1_mojo.so ffi/capi.mojo
+
+      - name: Python binding
+        env:
+          LIBSECP256K1_MOJO: ${{ github.workspace }}/libsecp256k1_mojo.so
+        run: python3 examples/use_from_python.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Node binding
+        env:
+          LIBSECP256K1_MOJO: ${{ github.workspace }}/libsecp256k1_mojo.so
+        run: |
+          cd examples/node
+          npm install --omit=dev
+          node index.js
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libsecp256k1_mojo-linux-x64
+          path: libsecp256k1_mojo.so
+          retention-days: 7
+
+  docker:
+    name: docker images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # The library image runs the whole test suite during its build, so this
+      # failing means a test failed.
+      - name: Build the library image
+        run: docker build -t secp256k1-mojo .
+
+      - name: Smoke test
+        run: docker run --rm secp256k1-mojo
+
+      - name: Build the examples image
+        run: docker build -f Dockerfile.examples -t secp256k1-mojo-examples .
+
+      - name: Run the examples
+        run: docker run --rm secp256k1-mojo-examples

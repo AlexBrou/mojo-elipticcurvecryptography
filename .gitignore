@@ -1,0 +1,14 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# Rust comparison benchmark. Cargo.lock IS committed: the point of that
+# benchmark is a reproducible number, which means pinned dependencies.
+bench/k256/target/
+
+# The reference C library is cloned on demand by tools/fetch_reference.sh:
+# it is a full upstream history and does not belong in this repository.
+reference/
+
+# node
+examples/node/node_modules/

@@ -1,0 +1,10 @@
+{
+  "name": "secp256k1-mojo-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Calls the Mojo secp256k1 shared library from Node via koffi",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "dependencies": { "koffi": "^2.9.0" }
+}

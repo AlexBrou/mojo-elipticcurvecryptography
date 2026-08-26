@@ -1,0 +1,11 @@
+# The reference C library is cloned inside the image instead of copied: the
+# working tree carries a full git history and build trees we do not want.
+reference/
+.pixi/
+bench/k256/target/
+examples/node/node_modules/
+.git/
+*.dylib
+*.so
+
+# vendor/ IS needed: it holds the sha256 submodule

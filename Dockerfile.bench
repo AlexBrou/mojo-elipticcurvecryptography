@@ -1,0 +1,59 @@
+# The benchmark image: this port, libsecp256k1, and Rust's k256, all built and
+# run in one place so the numbers come from identical hardware and flags.
+#
+#   docker build -f Dockerfile.bench -t secp256k1-mojo-bench .
+#   docker run --rm secp256k1-mojo-bench              # Mojo vs C, side by side
+#   docker run --rm secp256k1-mojo-bench ./bench/k256/run.sh   # the Rust one
+#
+# Kept separate from the main Dockerfile because it needs the C and Rust
+# toolchains, which have no business in a runtime image.
+#
+# Two caveats on the numbers. Containers add scheduling noise, so treat these
+# as indicative and run on the host for anything you intend to quote. And the
+# GPU benchmark is skipped: Metal is not available to Linux containers.
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl git clang make python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PIXI_HOME=/opt/pixi
+ENV PATH=/opt/pixi/bin:$PATH
+RUN curl -fsSL https://pixi.sh/install.sh | bash
+
+# Rust, for the k256 comparison
+ENV RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo
+ENV PATH=/opt/cargo/bin:$PATH
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+
+WORKDIR /app
+
+COPY pixi.toml pixi.lock ./
+RUN pixi install
+
+# libsecp256k1, built the way the project prefers (it forces -O2 over -O3)
+RUN git clone --depth 1 https://github.com/bitcoin-core/secp256k1.git \
+        reference/secp256k1 \
+    && cd reference/secp256k1 \
+    && pixi run --manifest-path /app/pixi.toml cmake -B build \
+        -DSECP256K1_BUILD_BENCHMARK=ON -DSECP256K1_BUILD_TESTS=OFF \
+        -DSECP256K1_ENABLE_MODULE_RECOVERY=ON -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_COMPILER=clang -DCMAKE_MAKE_PROGRAM=make \
+    && pixi run --manifest-path /app/pixi.toml cmake --build build -j"$(nproc)"
+
+COPY . .
+
+# The sha256 dependency is a git submodule. `docker build` copies the working
+# tree, so an uninitialised submodule gives an empty directory and a confusing
+# compile error rather than a clear one.
+RUN test -f vendor/mojo-sha256/src/sha256/__init__.mojo \
+    || (echo "vendor/mojo-sha256 is empty; run: git submodule update --init --recursive" >&2; exit 1)
+
+ENV SECP256K1_SKIP_GPU=1
+
+# Warm both build caches so `docker run` measures, rather than compiles.
+RUN pixi run mojo build -I . -I src -I vendor/mojo-sha256/src -o /tmp/warm_bench bench/bench.mojo \
+    && rm -f /tmp/warm_bench \
+    && cd bench/k256 && cargo build --release && cd /app
+
+CMD ["./bench/compare.sh"]

@@ -1,0 +1,3 @@
+[submodule "vendor/mojo-sha256"]
+	path = vendor/mojo-sha256
+	url = https://github.com/AlexBrou/mojo-sha256.git

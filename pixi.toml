@@ -1,0 +1,15 @@
+[workspace]
+authors = ["alexbrou <alexandrepilarbrou@gmail.com>"]
+channels = ["https://conda.modular.com/max", "conda-forge"]
+name = "mojo-secp256k1"
+platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
+version = "0.1.0"
+
+[tasks]
+test = "./run_tests.sh"
+bench = "mojo run -I . -I src -I vendor/mojo-sha256/src bench/bench.mojo"
+
+[dependencies]
+mojo = ">=1.0.0,<2"
+cmake = ">=4.4.2,<5"
+max = ">=26.5.0,<27"
