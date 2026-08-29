@@ -284,14 +284,14 @@ struct Fe(Copyable, ImplicitlyCopyable, Movable):
 
     def cmp_var(self, other: Fe) -> Int:
         """Lexicographic compare of two *normalized* elements."""
-        var a: InlineArray[UInt64, 5] = [
+        var a: Array[UInt64, 5] = [
             self.n0,
             self.n1,
             self.n2,
             self.n3,
             self.n4,
         ]
-        var b: InlineArray[UInt64, 5] = [
+        var b: Array[UInt64, 5] = [
             other.n0,
             other.n1,
             other.n2,

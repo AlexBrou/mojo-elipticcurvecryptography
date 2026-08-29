@@ -346,11 +346,11 @@ def _reduce(a: Scalar, overflow: UInt64) -> Scalar:
     return Scalar(r0, r1, r2, r3)
 
 
-def _mul_512(a: Scalar, b: Scalar) -> InlineArray[UInt64, 8]:
+def _mul_512(a: Scalar, b: Scalar) -> Array[UInt64, 8]:
     """Schoolbook 4x4 -> 8 limb product."""
-    var av: InlineArray[UInt64, 4] = [a.d0, a.d1, a.d2, a.d3]
-    var bv: InlineArray[UInt64, 4] = [b.d0, b.d1, b.d2, b.d3]
-    var l = InlineArray[UInt64, 8](fill=0)
+    var av: Array[UInt64, 4] = [a.d0, a.d1, a.d2, a.d3]
+    var bv: Array[UInt64, 4] = [b.d0, b.d1, b.d2, b.d3]
+    var l = Array[UInt64, 8](fill=0)
     for i in range(4):
         var carry = UInt64(0)
         for j in range(4):
@@ -366,7 +366,7 @@ def _mul_512(a: Scalar, b: Scalar) -> InlineArray[UInt64, 8]:
 
 
 @always_inline
-def _reduce_512(l: InlineArray[UInt64, 8]) -> Scalar:
+def _reduce_512(l: Array[UInt64, 8]) -> Scalar:
     """Reduce a 512-bit value modulo n, following scalar_4x64_impl.h."""
     var n0 = l[4]
     var n1 = l[5]
@@ -489,12 +489,12 @@ def _inverse(a: Scalar) -> Scalar:
     """a^(n-2) mod n via a fixed 4-bit window. The exponent is public, so the
     window pattern leaks nothing about `a`."""
     # table[i] = a^i for i in 0..15
-    var table = InlineArray[Scalar, 16](fill=Scalar.one())
+    var table = Array[Scalar, 16](fill=Scalar.one())
     table[1] = a
     for i in range(2, 16):
         table[i] = table[i - 1] * a
 
-    var limbs: InlineArray[UInt64, 4] = [_NM2_0, _NM2_1, _NM2_2, _NM2_3]
+    var limbs: Array[UInt64, 4] = [_NM2_0, _NM2_1, _NM2_2, _NM2_3]
     var r = Scalar.one()
     var started = False
     for w in range(63, -1, -1):

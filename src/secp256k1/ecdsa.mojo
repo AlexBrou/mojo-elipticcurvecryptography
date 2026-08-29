@@ -98,7 +98,7 @@ def sign(
     var msg = Scalar.from_bytes(msg32)[0]
 
     # RFC 6979 key material: seckey || message reduced mod n.
-    var keydata = InlineArray[UInt8, 64](fill=0)
+    var keydata = Array[UInt8, 64](fill=0)
     var msg_bytes = msg.to_bytes()
     for i in range(32):
         keydata[i] = seckey32[i]

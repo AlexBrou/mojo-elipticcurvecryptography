@@ -123,7 +123,7 @@ comptime WNAF_WINDOW_A = 5
 comptime WNAF_TABLE_A = 1 << (WNAF_WINDOW_A - 1)  # 16 odd multiples
 
 
-def _odd_multiples_globalz(a: Gej) -> Tuple[InlineArray[Ge, WNAF_TABLE_A], Fe]:
+def _odd_multiples_globalz(a: Gej) -> Tuple[Array[Ge, WNAF_TABLE_A], Fe]:
     """Odd multiples of A on a single shared z, without any field inversion.
 
     Entry i is the pair (x, y) of (2i+1)*A in a frame scaled by the returned
@@ -141,8 +141,8 @@ def _odd_multiples_globalz(a: Gej) -> Tuple[InlineArray[Ge, WNAF_TABLE_A], Fe]:
     var d = a.double()
     var d_ge = Ge(d.x, d.y, False)
 
-    var pre = InlineArray[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
-    var zr = InlineArray[Fe, WNAF_TABLE_A](fill=Fe.from_int(1))
+    var pre = Array[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
+    var zr = Array[Fe, WNAF_TABLE_A](fill=Fe.from_int(1))
 
     # Move A into the frame where d is affine.
     pre[0] = Ge.set_ge_zinv(Ge(a.x, a.y, False), d.z)
@@ -165,14 +165,14 @@ def _odd_multiples_globalz(a: Gej) -> Tuple[InlineArray[Ge, WNAF_TABLE_A], Fe]:
     return (pre^, ai.z * d.z)
 
 
-def _odd_multiples_fixed(a: Gej) -> InlineArray[Ge, WNAF_TABLE_A]:
+def _odd_multiples_fixed(a: Gej) -> Array[Ge, WNAF_TABLE_A]:
     """The same table as `_odd_multiples`, on the stack.
 
     `ecmult` builds two of these per call, so keeping them out of the heap is
     worth the specialisation. The batch inversion is inlined for the same
     reason: one field inversion for the whole table, no temporaries.
     """
-    var jac = InlineArray[Gej, WNAF_TABLE_A](fill=a)
+    var jac = Array[Gej, WNAF_TABLE_A](fill=a)
     var d = a.double()
     var cur = a
     for i in range(WNAF_TABLE_A):
@@ -180,14 +180,14 @@ def _odd_multiples_fixed(a: Gej) -> InlineArray[Ge, WNAF_TABLE_A]:
         cur = cur.add_var(d)
 
     # Montgomery's trick: prefix[i] is the product of z_0..z_{i-1}.
-    var prefix = InlineArray[Fe, WNAF_TABLE_A](fill=Fe.from_int(1))
+    var prefix = Array[Fe, WNAF_TABLE_A](fill=Fe.from_int(1))
     var acc = Fe.from_int(1)
     for i in range(WNAF_TABLE_A):
         prefix[i] = acc
         acc = acc * jac[i].z
 
     var inv = acc.inv_var()
-    var out = InlineArray[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
+    var out = Array[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
     for i in range(WNAF_TABLE_A - 1, -1, -1):
         var zinv = prefix[i] * inv
         inv = inv * jac[i].z
@@ -198,7 +198,7 @@ def _odd_multiples_fixed(a: Gej) -> InlineArray[Ge, WNAF_TABLE_A]:
 
 def _all_multiples_globalz(
     a: Gej,
-) -> Tuple[InlineArray[Ge, CONST_TABLE_SIZE], Fe]:
+) -> Tuple[Array[Ge, CONST_TABLE_SIZE], Fe]:
     """Multiples A, 2A, ... 16*A on a shared z, without a field inversion.
 
     Same idea as `_odd_multiples_globalz`, stepping by A instead of 2A. The
@@ -208,8 +208,8 @@ def _all_multiples_globalz(
     """
     var a_ge = Ge(a.x, a.y, False)
 
-    var pre = InlineArray[Ge, CONST_TABLE_SIZE](fill=Ge.infinity_point())
-    var zr = InlineArray[Fe, CONST_TABLE_SIZE](fill=Fe.from_int(1))
+    var pre = Array[Ge, CONST_TABLE_SIZE](fill=Ge.infinity_point())
+    var zr = Array[Fe, CONST_TABLE_SIZE](fill=Fe.from_int(1))
 
     # Work in the frame where A itself is affine: (a.x, a.y) with z == 1 is A
     # scaled by a.z, and the group law carries that scaling through, so the
@@ -269,8 +269,8 @@ def ecmult_const(a: Ge, q: Scalar) -> Gej:
     var s1 = split[0].cond_negate(neg1)
     var s2 = split[1].cond_negate(neg2)
 
-    var d1 = InlineArray[Int, CONST_SPLIT_DIGITS](fill=0)
-    var d2 = InlineArray[Int, CONST_SPLIT_DIGITS](fill=0)
+    var d1 = Array[Int, CONST_SPLIT_DIGITS](fill=0)
+    var d2 = Array[Int, CONST_SPLIT_DIGITS](fill=0)
     _recode_const(s1, d1)
     _recode_const(s2, d2)
 
@@ -288,7 +288,7 @@ def ecmult_const(a: Ge, q: Scalar) -> Gej:
     return acc
 
 
-def _recode_const(s: Scalar, mut digits: InlineArray[Int, CONST_SPLIT_DIGITS]):
+def _recode_const(s: Scalar, mut digits: Array[Int, CONST_SPLIT_DIGITS]):
     """Signed 5-bit recoding of a GLV half; digits land in [-15, 16]."""
     var carry = 0
     for i in range(CONST_SPLIT_DIGITS):
@@ -304,7 +304,7 @@ def _recode_const(s: Scalar, mut digits: InlineArray[Int, CONST_SPLIT_DIGITS]):
 @always_inline
 def _accumulate(
     acc: Gej,
-    table: InlineArray[Ge, CONST_TABLE_SIZE],
+    table: Array[Ge, CONST_TABLE_SIZE],
     d: Int,
     twist: Bool,
     flip: Bool,
@@ -337,7 +337,7 @@ comptime WNAF_BITS = 129
 
 
 def _wnaf_into(
-    a: Scalar, size: Int, w: Int, mut wnaf: InlineArray[Int32, WNAF_BITS]
+    a: Scalar, size: Int, w: Int, mut wnaf: Array[Int32, WNAF_BITS]
 ) -> Int:
     """Width-w NAF of `a` over `size` bits, written into `wnaf`.
 
@@ -383,17 +383,17 @@ def ecmult(ctx: EcmultGenContext, a: Gej, na: Scalar, ng: Scalar) -> Gej:
     if not have_a and not have_g:
         return Gej.infinity_point()
 
-    var wa1 = InlineArray[Int32, WNAF_BITS](fill=0)
-    var wa2 = InlineArray[Int32, WNAF_BITS](fill=0)
-    var wg1 = InlineArray[Int32, WNAF_BITS](fill=0)
-    var wg2 = InlineArray[Int32, WNAF_BITS](fill=0)
+    var wa1 = Array[Int32, WNAF_BITS](fill=0)
+    var wa2 = Array[Int32, WNAF_BITS](fill=0)
+    var wg1 = Array[Int32, WNAF_BITS](fill=0)
+    var wg2 = Array[Int32, WNAF_BITS](fill=0)
     var la1 = 0
     var la2 = 0
     var lg1 = 0
     var lg2 = 0
 
-    var ta1 = InlineArray[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
-    var ta2 = InlineArray[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
+    var ta1 = Array[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
+    var ta2 = Array[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
     # The A table lives in a frame scaled by zframe; the G tables are true
     # affine points, so their additions have to correct for it.
     var zframe = Fe.from_int(1)
@@ -474,8 +474,8 @@ def ecmult_var(a: Gej, na: Scalar) -> Gej:
     var neg1 = split[0].is_high()
     var neg2 = split[1].is_high()
 
-    var w1 = InlineArray[Int32, WNAF_BITS](fill=0)
-    var w2 = InlineArray[Int32, WNAF_BITS](fill=0)
+    var w1 = Array[Int32, WNAF_BITS](fill=0)
+    var w2 = Array[Int32, WNAF_BITS](fill=0)
     var l1 = _wnaf_into(
         split[0].cond_negate(neg1), WNAF_BITS, WNAF_WINDOW_A, w1
     )
@@ -528,15 +528,15 @@ def _add_g(r: Gej, table: List[Ge], d: Int, zframe: Fe, scaled: Bool) -> Gej:
 
 
 def _lambda_table(
-    t: InlineArray[Ge, WNAF_TABLE_A]
-) -> InlineArray[Ge, WNAF_TABLE_A]:
+    t: Array[Ge, WNAF_TABLE_A]
+) -> Array[Ge, WNAF_TABLE_A]:
     """The odd multiples of lambda*A, from those of A.
 
     lambda*(x, y) == (beta*x, y), so this is one field multiplication per
     entry rather than a second table build with its own inversion — which is
     what this used to do, and it cost about 4.4 us per call.
     """
-    var out = InlineArray[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
+    var out = Array[Ge, WNAF_TABLE_A](fill=Ge.infinity_point())
     for i in range(WNAF_TABLE_A):
         out[i] = Ge(t[i].x * BETA, t[i].y, False)
     return out^
@@ -544,7 +544,7 @@ def _lambda_table(
 
 @always_inline
 def _add_signed_fixed(
-    r: Gej, table: InlineArray[Ge, WNAF_TABLE_A], d: Int, flip: Bool
+    r: Gej, table: Array[Ge, WNAF_TABLE_A], d: Int, flip: Bool
 ) -> Gej:
     """Add (+/-)|d|*A. `flip` folds in the sign of the scalar half, so the
     table can be built once from the unsigned point."""

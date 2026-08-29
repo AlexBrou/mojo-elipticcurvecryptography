@@ -15,15 +15,15 @@ comptime M62: UInt64 = 0xFFFFFFFFFFFFFFFF >> 2
 struct Signed62(Copyable, Movable):
     """A number as five signed 62-bit limbs, least significant first."""
 
-    var v: InlineArray[Int64, 5]
+    var v: Array[Int64, 5]
 
     @staticmethod
     def zero() -> Signed62:
-        return Signed62(InlineArray[Int64, 5](fill=0))
+        return Signed62(Array[Int64, 5](fill=0))
 
     @staticmethod
     def of(a: Int64, b: Int64, c: Int64, d: Int64, e: Int64) -> Signed62:
-        var arr: InlineArray[Int64, 5] = [a, b, c, d, e]
+        var arr: Array[Int64, 5] = [a, b, c, d, e]
         return Signed62(arr^)
 
 

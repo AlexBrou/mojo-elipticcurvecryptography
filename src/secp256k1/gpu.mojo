@@ -47,7 +47,7 @@ comptime JACOBIAN_WORDS = 24
 @always_inline
 def _load_scalar(p: Pointer[UInt32, MutAnyOrigin], i: Int) -> ScalarBits:
     var base = i * SCALAR_WORDS
-    var d = InlineArray[UInt32, 8](fill=0)
+    var d = Array[UInt32, 8](fill=0)
     for j in range(8):
         d[j] = p[unsafe_offset=base + j]
     return ScalarBits(d^)
@@ -55,7 +55,7 @@ def _load_scalar(p: Pointer[UInt32, MutAnyOrigin], i: Int) -> ScalarBits:
 
 @always_inline
 def _load_fe(p: Pointer[UInt32, MutAnyOrigin], base: Int) -> FeGpu:
-    var d = InlineArray[UInt32, 8](fill=0)
+    var d = Array[UInt32, 8](fill=0)
     for j in range(8):
         d[j] = p[unsafe_offset=base + j]
     return FeGpu(d^)
@@ -128,7 +128,7 @@ def kernel_mul_point(
 
 @always_inline
 def _order_fe() -> FeGpu:
-    var d: InlineArray[UInt32, 8] = [
+    var d: Array[UInt32, 8] = [
         0xD0364141,
         0xBFD25E8C,
         0xAF48A03B,
@@ -143,7 +143,7 @@ def _order_fe() -> FeGpu:
 
 @always_inline
 def _p_minus_order_fe() -> FeGpu:
-    var d: InlineArray[UInt32, 8] = [
+    var d: Array[UInt32, 8] = [
         0x2FC9BAEE,
         0x402DA172,
         0x50B75FC4,

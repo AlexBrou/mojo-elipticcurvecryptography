@@ -34,9 +34,9 @@ struct FeGpu(Copyable, ImplicitlyCopyable, Movable):
     """A canonical field element: eight 32-bit limbs, least significant first.
     """
 
-    var n: InlineArray[UInt32, 8]
+    var n: Array[UInt32, 8]
 
-    def __init__(out self, var n: InlineArray[UInt32, 8]):
+    def __init__(out self, var n: Array[UInt32, 8]):
         self.n = n^
 
     def __init__(out self, *, copy: Self):
@@ -47,31 +47,31 @@ struct FeGpu(Copyable, ImplicitlyCopyable, Movable):
 
     @staticmethod
     def zero() -> FeGpu:
-        return FeGpu(InlineArray[UInt32, 8](fill=0))
+        return FeGpu(Array[UInt32, 8](fill=0))
 
     @staticmethod
     def one() -> FeGpu:
-        var a = InlineArray[UInt32, 8](fill=0)
+        var a = Array[UInt32, 8](fill=0)
         a[0] = 1
         return FeGpu(a^)
 
     @staticmethod
     def from_int(v: UInt32) -> FeGpu:
-        var a = InlineArray[UInt32, 8](fill=0)
+        var a = Array[UInt32, 8](fill=0)
         a[0] = v
         return FeGpu(a^)
 
     @staticmethod
     def modulus() -> FeGpu:
-        var a = InlineArray[UInt32, 8](fill=0xFFFFFFFF)
+        var a = Array[UInt32, 8](fill=0xFFFFFFFF)
         a[0] = P0
         a[1] = P1
         return FeGpu(a^)
 
     @staticmethod
-    def from_bytes(b: InlineArray[UInt8, 32]) -> FeGpu:
+    def from_bytes(b: Array[UInt8, 32]) -> FeGpu:
         """Parse 32 big-endian bytes, reducing if the value is >= p."""
-        var a = InlineArray[UInt32, 8](fill=0)
+        var a = Array[UInt32, 8](fill=0)
         for i in range(8):
             var base = 28 - 4 * i
             a[i] = (
@@ -83,8 +83,8 @@ struct FeGpu(Copyable, ImplicitlyCopyable, Movable):
         var r = FeGpu(a^)
         return _cond_sub_p(_cond_sub_p(r))
 
-    def to_bytes(self) -> InlineArray[UInt8, 32]:
-        var out = InlineArray[UInt8, 32](fill=0)
+    def to_bytes(self) -> Array[UInt8, 32]:
+        var out = Array[UInt8, 32](fill=0)
         for i in range(8):
             var base = 28 - 4 * i
             out[base] = UInt8(self.n[i] >> 24)
@@ -119,7 +119,7 @@ struct FeGpu(Copyable, ImplicitlyCopyable, Movable):
     # ------------------------------------------------------------- arithmetic
 
     def __add__(self, b: FeGpu) -> FeGpu:
-        var r = InlineArray[UInt32, 8](fill=0)
+        var r = Array[UInt32, 8](fill=0)
         var carry = UInt64(0)
         for i in range(8):
             var v = UInt64(self.n[i]) + UInt64(b.n[i]) + carry
@@ -134,7 +134,7 @@ struct FeGpu(Copyable, ImplicitlyCopyable, Movable):
         return _cond_sub_p(s)
 
     def __sub__(self, b: FeGpu) -> FeGpu:
-        var r = InlineArray[UInt32, 8](fill=0)
+        var r = Array[UInt32, 8](fill=0)
         var borrow = Int64(0)
         for i in range(8):
             var v = Int64(self.n[i]) - Int64(b.n[i]) - borrow
@@ -155,7 +155,7 @@ struct FeGpu(Copyable, ImplicitlyCopyable, Movable):
         var t = self
         var carry = UInt32(0)
         if t.is_odd():
-            var r = InlineArray[UInt32, 8](fill=0)
+            var r = Array[UInt32, 8](fill=0)
             var c = UInt64(0)
             var m = FeGpu.modulus()
             for i in range(8):
@@ -164,14 +164,14 @@ struct FeGpu(Copyable, ImplicitlyCopyable, Movable):
                 c = v >> 32
             t = FeGpu(r^)
             carry = UInt32(c)
-        var out = InlineArray[UInt32, 8](fill=0)
+        var out = Array[UInt32, 8](fill=0)
         for i in range(7):
             out[i] = (t.n[i] >> 1) | (t.n[i + 1] << 31)
         out[7] = (t.n[7] >> 1) | (carry << 31)
         return FeGpu(out^)
 
     def mul_int(self, k: UInt32) -> FeGpu:
-        var l = InlineArray[UInt32, 16](fill=0)
+        var l = Array[UInt32, 16](fill=0)
         var carry = UInt64(0)
         for i in range(8):
             var v = UInt64(self.n[i]) * UInt64(k) + carry
@@ -181,7 +181,7 @@ struct FeGpu(Copyable, ImplicitlyCopyable, Movable):
         return _reduce512(l)
 
     def __mul__(self, b: FeGpu) -> FeGpu:
-        var l = InlineArray[UInt32, 16](fill=0)
+        var l = Array[UInt32, 16](fill=0)
         for i in range(8):
             var carry = UInt64(0)
             for j in range(8):
@@ -236,7 +236,7 @@ def _add_at_limb(a: FeGpu, pos: Int, v: UInt32) -> FeGpu:
 @always_inline
 def _add_modulus(a: FeGpu) -> FeGpu:
     var m = FeGpu.modulus()
-    var r = InlineArray[UInt32, 8](fill=0)
+    var r = Array[UInt32, 8](fill=0)
     var carry = UInt64(0)
     for i in range(8):
         var v = UInt64(a.n[i]) + UInt64(m.n[i]) + carry
@@ -249,7 +249,7 @@ def _add_modulus(a: FeGpu) -> FeGpu:
 def _cond_sub_p(a: FeGpu) -> FeGpu:
     """Subtract p when a >= p, otherwise return a unchanged."""
     var m = FeGpu.modulus()
-    var r = InlineArray[UInt32, 8](fill=0)
+    var r = Array[UInt32, 8](fill=0)
     var borrow = Int64(0)
     for i in range(8):
         var v = Int64(a.n[i]) - Int64(m.n[i]) - borrow
@@ -261,7 +261,7 @@ def _cond_sub_p(a: FeGpu) -> FeGpu:
 
 
 @always_inline
-def _acc_add(mut r: InlineArray[UInt32, 10], pos: Int, value: UInt64):
+def _acc_add(mut r: Array[UInt32, 10], pos: Int, value: UInt64):
     """Add `value` (a full 64-bit quantity) at limb `pos`, propagating carries.
     """
     var carry = value
@@ -273,13 +273,13 @@ def _acc_add(mut r: InlineArray[UInt32, 10], pos: Int, value: UInt64):
         j += 1
 
 
-def _reduce512(l: InlineArray[UInt32, 16]) -> FeGpu:
+def _reduce512(l: Array[UInt32, 16]) -> FeGpu:
     """Reduce a 512-bit value modulo p.
 
     Uses 2^256 == 2^32 + 977 (mod p), folding the high half down repeatedly
     until nothing is left above limb 7, then subtracting p at most twice.
     """
-    var r = InlineArray[UInt32, 10](fill=0)
+    var r = Array[UInt32, 10](fill=0)
     for i in range(8):
         r[i] = l[i]
 
@@ -299,7 +299,7 @@ def _reduce512(l: InlineArray[UInt32, 16]) -> FeGpu:
         _acc_add(r, 0, h * RED_LOW)
         _acc_add(r, 1, h)
 
-    var out = InlineArray[UInt32, 8](fill=0)
+    var out = Array[UInt32, 8](fill=0)
     for i in range(8):
         out[i] = r[i]
     var f = FeGpu(out^)
@@ -489,9 +489,9 @@ struct ScalarBits(Copyable, ImplicitlyCopyable, Movable):
     only ever needs to walk the bits of an already-computed scalar.
     """
 
-    var d: InlineArray[UInt32, 8]
+    var d: Array[UInt32, 8]
 
-    def __init__(out self, var d: InlineArray[UInt32, 8]):
+    def __init__(out self, var d: Array[UInt32, 8]):
         self.d = d^
 
     def __init__(out self, *, copy: Self):
@@ -534,8 +534,8 @@ comptime GEN_TABLE_WORDS = GEN_BLOCKS * GEN_ENTRIES * GEN_ENTRY_WORDS
 def load_ge(table: Pointer[UInt32, MutAnyOrigin], index: Int) -> GeGpu:
     """Read affine point `index` out of a flat uint32 table."""
     var base = index * GEN_ENTRY_WORDS
-    var x = InlineArray[UInt32, 8](fill=0)
-    var y = InlineArray[UInt32, 8](fill=0)
+    var x = Array[UInt32, 8](fill=0)
+    var y = Array[UInt32, 8](fill=0)
     for i in range(8):
         x[i] = table[unsafe_offset=base + i]
         y[i] = table[unsafe_offset=base + 8 + i]
@@ -566,7 +566,7 @@ def mul_gen(table: Pointer[UInt32, MutAnyOrigin], k: ScalarBits) -> GejGpu:
 def _beta() -> FeGpu:
     """The cube root of unity used by the endomorphism lambda*(x,y)=(beta*x,y).
     """
-    var d: InlineArray[UInt32, 8] = [
+    var d: Array[UInt32, 8] = [
         0x719501EE,
         0xC1396C28,
         0x12F58995,
