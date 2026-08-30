@@ -128,6 +128,19 @@ why `gpu32.mojo` reimplements the arithmetic in 32-bit limbs. It is tested on
 the CPU against the same vectors (`tests/test_gpu32.mojo`) so an arithmetic bug
 can never be mistaken for a kernel bug.
 
+**On macOS the Metal Toolchain is a separate Xcode component.** Having Xcode is
+not enough. Without it every kernel here fails to compile, `tests/test_gpu.mojo`
+included, and the error is unhelpful:
+
+    error: Metal Compiler failed to compile metallib. Please submit a bug report.
+
+pointing at the `from max.gpu.host import DeviceContext` line rather than at
+anything real. Check it before suspecting the kernel, the block size or the MAX
+install:
+
+    xcrun metal --version      # "missing Metal Toolchain" means this is it
+    xcodebuild -downloadComponent MetalToolchain
+
 Three things to know:
 
 - **Metal silently skips a kernel** whose launch configuration is too large,
