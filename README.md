@@ -610,6 +610,18 @@ construction so that shows up as an error rather than a wrong answer. The
 default block size of 32 was measured, not guessed; 512 triggers exactly this
 failure on an M2.
 
+On **NVIDIA** the same kernels hit a **Mojo compiler bug**, not a fault of this
+library. The PTX backend at `-O1` and above (the default is `-O3`) miscompiles
+the 32-bit-limb field multiply in `gpu32.mojo`: `_reduce512`, reached through a
+call that passes its `Array` accumulator by value, comes back zero, so every
+`k*G` collapses to the point at infinity and a batch reads back all zeros. It is
+correct at `-O0`, on the CPU at every level, and on Metal at `-O3` — and it is a
+regression, since stable Mojo 1.0.0 compiles it correctly at `-O3` and the
+nightly does not. Until it is fixed, build GPU code for NVIDIA at `-O0` (much
+slower). The vendored `mojo-sha256` is **not** affected — plain SHA-256 is
+correct on the device at `-O3`; only this 32-bit-limb arithmetic triggers it.
+Verified on an RTX 3070 (driver 595.71.05, CUDA 13.2); to be reported to Modular.
+
 ## What is not implemented
 
 Schnorr signatures (BIP 340), ElligatorSwift, silent payments, the
