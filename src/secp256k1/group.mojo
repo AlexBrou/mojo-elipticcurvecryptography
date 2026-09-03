@@ -42,7 +42,7 @@ comptime TAG_HYBRID_ODD: UInt8 = 0x07
 
 
 @fieldwise_init
-struct Ge(Copyable, ImplicitlyCopyable, Movable):
+struct Ge(ImplicitlyCopyable):
     """An affine point, or the point at infinity when `infinity` is set."""
 
     var x: Fe
@@ -166,7 +166,7 @@ struct Ge(Copyable, ImplicitlyCopyable, Movable):
 
 
 @fieldwise_init
-struct Gej(Copyable, ImplicitlyCopyable, Movable):
+struct Gej(ImplicitlyCopyable):
     """A Jacobian point: the affine point is (x/z^2, y/z^3)."""
 
     var x: Fe

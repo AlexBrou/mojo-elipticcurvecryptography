@@ -26,7 +26,7 @@ def _p_minus_order() -> Fe:
 
 
 @fieldwise_init
-struct Signature(Copyable, ImplicitlyCopyable, Movable):
+struct Signature(ImplicitlyCopyable):
     var r: Scalar
     var s: Scalar
 

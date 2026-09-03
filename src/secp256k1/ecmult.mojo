@@ -527,9 +527,7 @@ def _add_g(r: Gej, table: List[Ge], d: Int, zframe: Fe, scaled: Bool) -> Gej:
     return r.add_ge_var(p)
 
 
-def _lambda_table(
-    t: Array[Ge, WNAF_TABLE_A]
-) -> Array[Ge, WNAF_TABLE_A]:
+def _lambda_table(t: Array[Ge, WNAF_TABLE_A]) -> Array[Ge, WNAF_TABLE_A]:
     """The odd multiples of lambda*A, from those of A.
 
     lambda*(x, y) == (beta*x, y), so this is one field multiplication per

@@ -4,7 +4,7 @@ from std.pathlib import Path
 
 
 @fieldwise_init
-struct Row(Copyable, Movable):
+struct Row(Copyable):
     var op: String
     var args: List[String]
 

@@ -388,10 +388,15 @@ struct GpuBatch(Movable):
         var d_points = self.dev.enqueue_create_buffer[DType.uint32](
             n * JACOBIAN_WORDS
         )
+        # Pass the `DeviceBuffer`s themselves. Each is `DevicePassable` and
+        # reaches the kernel as the same `Pointer[UInt32, MutAnyOrigin]`, but
+        # `unsafe_ptr()` drops the link the lifetime checker uses across an
+        # asynchronous launch: `d_scalars` is last used here, so only the
+        # stream-ordered buffer release kept it alive until the kernel ran.
         self.dev.enqueue_function[kernel_mul_gen](
-            self.table.unsafe_ptr(),
-            d_scalars.unsafe_ptr(),
-            d_points.unsafe_ptr(),
+            self.table,
+            d_scalars,
+            d_points,
             Int64(n),
             grid_dim=self._grid(n),
             block_dim=self.block_size,
@@ -429,11 +434,11 @@ struct GpuBatch(Movable):
             n * JACOBIAN_WORDS
         )
         self.dev.enqueue_function[kernel_mul_point](
-            d_bases.unsafe_ptr(),
-            d_k1.unsafe_ptr(),
-            d_k2.unsafe_ptr(),
-            d_flags.unsafe_ptr(),
-            d_points.unsafe_ptr(),
+            d_bases,
+            d_k1,
+            d_k2,
+            d_flags,
+            d_points,
             Int64(n),
             grid_dim=self._grid(n),
             block_dim=self.block_size,
@@ -498,14 +503,14 @@ struct GpuBatch(Movable):
         var d_res = self.dev.enqueue_create_buffer[DType.uint32](n)
 
         self.dev.enqueue_function[kernel_verify](
-            self.table.unsafe_ptr(),
-            d_pub.unsafe_ptr(),
-            d_u1.unsafe_ptr(),
-            d_k1.unsafe_ptr(),
-            d_k2.unsafe_ptr(),
-            d_flags.unsafe_ptr(),
-            d_r.unsafe_ptr(),
-            d_res.unsafe_ptr(),
+            self.table,
+            d_pub,
+            d_u1,
+            d_k1,
+            d_k2,
+            d_flags,
+            d_r,
+            d_res,
             Int64(n),
             grid_dim=self._grid(n),
             block_dim=self.block_size,

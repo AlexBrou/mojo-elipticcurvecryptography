@@ -12,7 +12,7 @@ comptime M62: UInt64 = 0xFFFFFFFFFFFFFFFF >> 2
 
 
 @fieldwise_init
-struct Signed62(Copyable, Movable):
+struct Signed62(Copyable):
     """A number as five signed 62-bit limbs, least significant first."""
 
     var v: Array[Int64, 5]
@@ -28,7 +28,7 @@ struct Signed62(Copyable, Movable):
 
 
 @fieldwise_init
-struct ModInfo(Copyable, Movable):
+struct ModInfo(Copyable):
     var modulus: Signed62
     var modulus_inv62: UInt64
 
@@ -49,7 +49,7 @@ struct ModInfo(Copyable, Movable):
 
 
 @fieldwise_init
-struct Trans2x2(Copyable, ImplicitlyCopyable, Movable):
+struct Trans2x2(ImplicitlyCopyable):
     var u: Int64
     var v: Int64
     var q: Int64

@@ -37,7 +37,7 @@ def _hi(c: UInt128) -> UInt64:
 
 
 @fieldwise_init
-struct Scalar(Copyable, Equatable, ImplicitlyCopyable, Movable):
+struct Scalar(Equatable, ImplicitlyCopyable):
     var d0: UInt64
     var d1: UInt64
     var d2: UInt64
@@ -437,7 +437,7 @@ def _reduce_512(l: Array[UInt64, 8]) -> Scalar:
 
 
 @fieldwise_init
-struct _Acc(Copyable, ImplicitlyCopyable, Movable):
+struct _Acc(ImplicitlyCopyable):
     """A 192-bit accumulator matching the muladd/sumadd/extract macros."""
 
     var c0: UInt64

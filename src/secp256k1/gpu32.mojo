@@ -30,7 +30,7 @@ def _lo32(v: UInt64) -> UInt32:
     return UInt32(v & 0xFFFFFFFF)
 
 
-struct FeGpu(Copyable, ImplicitlyCopyable, Movable):
+struct FeGpu(ImplicitlyCopyable):
     """A canonical field element: eight 32-bit limbs, least significant first.
     """
 
@@ -349,7 +349,7 @@ def _fe_sqrt(a: FeGpu) -> FeGpu:
 
 
 @fieldwise_init
-struct GeGpu(Copyable, ImplicitlyCopyable, Movable):
+struct GeGpu(ImplicitlyCopyable):
     """An affine point, or infinity."""
 
     var x: FeGpu
@@ -370,7 +370,7 @@ struct GeGpu(Copyable, ImplicitlyCopyable, Movable):
 
 
 @fieldwise_init
-struct GejGpu(Copyable, ImplicitlyCopyable, Movable):
+struct GejGpu(ImplicitlyCopyable):
     """A Jacobian point: the affine point is (x/z^2, y/z^3)."""
 
     var x: FeGpu
@@ -482,7 +482,7 @@ struct GejGpu(Copyable, ImplicitlyCopyable, Movable):
 # ----------------------------------------------------------- scalar bits
 
 
-struct ScalarBits(Copyable, ImplicitlyCopyable, Movable):
+struct ScalarBits(ImplicitlyCopyable):
     """A 256-bit scalar as eight 32-bit limbs — read-only bit access.
 
     Scalar arithmetic (multiplication, inversion) stays on the host; a kernel

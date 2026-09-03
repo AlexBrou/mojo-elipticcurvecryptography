@@ -1,6 +1,12 @@
 """ECDSA and key tests, checked against vectors produced by libsecp256k1."""
 
-from std.testing import assert_equal, assert_true, assert_false, TestSuite
+from std.testing import (
+    assert_equal,
+    assert_false,
+    assert_raises,
+    assert_true,
+    TestSuite,
+)
 
 from secp256k1.api import Secp256k1
 from secp256k1.ecdsa import Signature
@@ -212,6 +218,52 @@ def test_high_s_rejected() raises:
         n += 1
         if n >= 8:
             break
+
+
+def test_short_input_is_rejected() raises:
+    """Every entry point taking caller-supplied bytes checks the length.
+
+    `Scalar.from_bytes` reads 32 bytes unconditionally, so a shorter span used
+    to abort on a bounds check with assertions enabled, and under
+    `-D ASSERT=none` to read past the end of the buffer -- returning a key
+    built from whatever happened to follow it.
+    """
+    var ctx = Secp256k1()
+    var short = List[UInt8](capacity=16)
+    for i in range(16):
+        short.append(UInt8(i + 1))
+    var full = List[UInt8](capacity=32)
+    for i in range(32):
+        full.append(UInt8(i + 1))
+    var g = Ge.generator()
+
+    assert_false(ctx.seckey_verify(short))
+
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.pubkey_create(short)
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.seckey_tweak_add(short, full)
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.seckey_tweak_add(full, short)
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.seckey_tweak_mul(short, full)
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.seckey_tweak_mul(full, short)
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.pubkey_tweak_add(g, short)
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.pubkey_tweak_mul(g, short)
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.ecdh_point(g, short)
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.sign(short, full)
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.sign(full, short)
+
+    # An empty span is the same mistake, and must not be read as zero.
+    var empty = List[UInt8]()
+    with assert_raises(contains="32 bytes"):
+        _ = ctx.ecdh_point(g, empty)
 
 
 def main() raises:

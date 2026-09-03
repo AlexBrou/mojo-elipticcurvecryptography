@@ -20,10 +20,10 @@ from secp256k1.util import hex_to_bytes, bytes_to_hex
 from tests.vec import load, Row
 
 
-def to_arr32(b: List[UInt8]) raises -> InlineArray[UInt8, 32]:
+def to_arr32(b: List[UInt8]) raises -> Array[UInt8, 32]:
     if len(b) != 32:
         raise Error("expected 32 bytes")
-    var a = InlineArray[UInt8, 32](fill=0)
+    var a = Array[UInt8, 32](fill=0)
     for i in range(32):
         a[i] = b[i]
     return a^
@@ -46,7 +46,7 @@ def fe_hex(a: FeGpu) -> String:
 
 def parse_scalar(h: String) raises -> ScalarBits:
     var b = hex_to_bytes(h)
-    var d = InlineArray[UInt32, 8](fill=0)
+    var d = Array[UInt32, 8](fill=0)
     for i in range(8):
         var base = 28 - 4 * i
         d[i] = (
@@ -64,8 +64,8 @@ def parse_point(h: String) raises -> GeGpu:
     var b = hex_to_bytes(h)
     if len(b) != 65 or b[0] != 0x04:
         raise Error("expected an uncompressed point")
-    var x = InlineArray[UInt8, 32](fill=0)
-    var y = InlineArray[UInt8, 32](fill=0)
+    var x = Array[UInt8, 32](fill=0)
+    var y = Array[UInt8, 32](fill=0)
     for i in range(32):
         x[i] = b[1 + i]
         y[i] = b[33 + i]
@@ -214,7 +214,7 @@ def test_mul_point() raises:
 
 def scalar_to_bits(s: Scalar) raises -> ScalarBits:
     var b = s.to_bytes()
-    var d = InlineArray[UInt32, 8](fill=0)
+    var d = Array[UInt32, 8](fill=0)
     for i in range(8):
         var base = 28 - 4 * i
         d[i] = (

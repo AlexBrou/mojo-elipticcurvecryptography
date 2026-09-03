@@ -16,7 +16,7 @@ from secp256k1.scalar import Scalar
 comptime ROUNDS = 10
 
 
-struct Timer(Copyable, Movable):
+struct Timer(Copyable):
     var best: Float64
     var worst: Float64
     var total: Float64

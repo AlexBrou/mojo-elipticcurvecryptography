@@ -18,7 +18,7 @@ comptime P0: UInt64 = 0xFFFFEFFFFFC2F
 
 
 @fieldwise_init
-struct Fe(Copyable, ImplicitlyCopyable, Movable):
+struct Fe(ImplicitlyCopyable):
     """Five 52-bit limbs, least significant first."""
 
     var n0: UInt64
